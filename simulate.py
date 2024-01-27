@@ -1,6 +1,7 @@
 import argparse
-import doubleLRU
-import demotion
+from cache_algos.LRU_LRU import DoubleLRU
+from cache_algos.Co_Cache import CoCache
+#import demotion
 
 def object_start_offset(object_id):
     return object_id * (500 * 1024 * 1024)
@@ -36,11 +37,11 @@ class CacheSimulator:
         self.cache.printResult()
 
 def createCache(algo, firCacheSz, secCacheSZ, bs):
-    if algo == 'lru':
-        return doubleLRU.DoubleLRU(int(firCacheSz / bs),
+    if algo == 'lru_lru':
+        return DoubleLRU(int(firCacheSz / bs),
                                    int(secCacheSZ / bs))
-    elif algo == "demotion":
-        return demotion.Demotion()
+    elif algo == "cocache":
+        return CoCache(int(firCacheSz / bs), int(secCacheSZ / bs))
     elif algo == '2Q':
         pass
         #return twoq.TwoQ()
@@ -60,6 +61,11 @@ parser.add_argument('-fcsz', '--first_cache_size',
                     type=int, help='First Level Cache Size in MB')
 parser.add_argument('-scsz', '--second_cache_size',
                     type=int, help='Second Level Cache Size in MB')
+parser.add_argument('-redun', '--redundancy_calculate',
+                    type=int, help='Redundancy Rate between Two Level Cache Calculate')
+parser.add_argument('-itval', '--interval',
+                    type=int, help='Interval for Redundancy Rate Calculate')
+
 
 # 解析命令行参数
 args = parser.parse_args()
@@ -75,14 +81,21 @@ file_path = args.trace_file
 num_lines = 0
 
 with open(file_path, 'r') as file:
+        total_lines = sum(1 for line in file)
+
+interval = max(1, total_lines // args.interval)
+
+with open(file_path, 'r') as file:
     for line in file:
+        if(args.redundancy_calculate and num_lines % interval == 0):
+            print(f"Current rate: {simulator.cache.printRedundancy() * 100:.2f}%")
         num_lines += 1
         object_id, start_time, latency, offset, length = line.strip().split(',')
         offset_bytes = int(offset) + object_start_offset(int(object_id))
         length_bytes = int(length)
 
-        start_alignment_offset = int(offset_bytes / block_size)
-        end_alignment_offset = int((offset_bytes + length_bytes) / block_size)
+        start_alignment_offset = int(offset_bytes // block_size)
+        end_alignment_offset = int((offset_bytes + length_bytes - 1) // block_size)
 
         num_blocks = end_alignment_offset - start_alignment_offset + 1
 
